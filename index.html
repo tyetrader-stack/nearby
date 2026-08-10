@@ -52,9 +52,8 @@
   .you-halo { fill: none; stroke: var(--ink); stroke-width: 1; opacity: 0.35; }
   .blip { cursor: pointer; }
 
-  .sweep { animation: spin 7s linear infinite; transform-origin: 150px 150px; display: none; }
+  .sweep { display: none; }
   .sweep.on { display: block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
 
   .radar-caption {
     display: flex; align-items: center; gap: 8px;
@@ -389,6 +388,8 @@ function drawRadar() {
     html += `<circle cx="${c}" cy="${c}" r="${r}" class="ring"/>
              <text x="${c + 4}" y="${c - r + 11}" class="ring-label">${m}m</text>`;
   });
+
+  html += `<rect x="${c - maxR}" y="${c - maxR}" width="${maxR * 2}" height="${maxR * 2}" class="ring"/>`;
 
   html += `<line x1="${c}" y1="${c - maxR}" x2="${c}" y2="${c + maxR}" class="crosshair"/>
            <line x1="${c - maxR}" y1="${c}" x2="${c + maxR}" y2="${c}" class="crosshair"/>`;
