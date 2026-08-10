@@ -311,7 +311,7 @@ const INTENTS = {
   swap:  { label: "Skill swap",        blurb: "Teach what you know, learn what you don't",        color: "#D98C1F" },
 };
 
-const MAX_RANGE = 1400;
+const MAX_RANGE = 3000;
 let state = {
   isLive: false, myBroadcastId: null,
   myIntent: "build", myNote: "", myName: "",
@@ -380,7 +380,7 @@ function drawRadar() {
       </radialGradient>
     </defs>`;
 
-  [400, 800, 1200].forEach(m => {
+  [1000, 2000, 3000].forEach(m => {
     const r = (m / MAX_RANGE) * maxR;
     html += `<circle cx="${c}" cy="${c}" r="${r}" class="ring"/>
              <text x="${c + 4}" y="${c - r + 11}" class="ring-label">${m}m</text>`;
@@ -423,7 +423,7 @@ function drawRadar() {
 
   $("liveDot").className = "live-dot" + (state.isLive ? " on" : "");
   $("liveText").textContent = state.isLive
-    ? "You're visible to people within 1.4 km"
+    ? "You're visible to people within 3 km"
     : "You're hidden — nobody can see you";
 }
 
