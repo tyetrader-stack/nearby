@@ -52,8 +52,9 @@
   .you-halo { fill: none; stroke: var(--ink); stroke-width: 1; opacity: 0.35; }
   .blip { cursor: pointer; }
 
-  .sweep { display: none; }
+  .sweep { animation: spin 7s linear infinite; transform-origin: 150px 150px; display: none; }
   .sweep.on { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .radar-caption {
     display: flex; align-items: center; gap: 8px;
@@ -273,13 +274,13 @@
     <textarea class="note-input" id="noteInput" maxlength="140"
       placeholder="One line so people know what they'd be walking into. Be specific — it's what makes someone reach out."></textarea>
     <div class="char"><span id="charCount">0</span>/140</div>
-    <button class="go-live" id="goLive" disabled>Go live for 2 hours</button>
+    <button class="go-live" id="goLive" disabled>Finding your location…</button>
   </section>
 
   <section>
     <div class="feed-head">
       <h2>Live right now</h2>
-      <span class="count"><span id="feedCount">6</span> broadcasting</span>
+      <span class="count"><span id="feedCount">0</span> broadcasting</span>
     </div>
     <div class="search-wrap">
       <input class="search" id="search" placeholder="Search names, notes, or tags" />
@@ -287,9 +288,7 @@
     </div>
     <div class="chips" id="chips"></div>
     <div id="feed"></div>
-    <div class="empty" id="empty">
-      Nobody nearby is broadcasting that right now. Try another filter, or go live yourself and let them find you.
-    </div>
+    <div class="empty" id="empty">Finding your location…</div>
   </section>
 
   <p class="footnote">
@@ -298,7 +297,13 @@
   </p>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+/* ---------- backend ---------- */
+const SUPABASE_URL = "https://mopuxeuqftmpjxummnfs.supabase.co";
+const SUPABASE_KEY = "sb_publishable_rPBcB_Z2zCZB5pjLKoqv7g_wooEI2I_";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const INTENTS = {
   chat:  { label: "Open to chat",      blurb: "Coffee, a walk, a conversation with someone new", color: "#FF5C39" },
   study: { label: "Study partner",     blurb: "Working through something and want company",       color: "#1B9E6E" },
@@ -306,18 +311,14 @@ const INTENTS = {
   swap:  { label: "Skill swap",        blurb: "Teach what you know, learn what you don't",        color: "#D98C1F" },
 };
 
-const NEARBY = [
-  { id: 1, name: "Marisol", intent: "build", note: "Prototyping a tool for tracking apprenticeship hours. Need someone who can wire up a backend.", distance: 180,  bearing: 42,  minutesAgo: 4,  tags: ["React", "First-time founder"] },
-  { id: 2, name: "Dae",     intent: "study", note: "Journeyman electrical exam in November. Working through code calculations most evenings.",      distance: 340,  bearing: 155, minutesAgo: 11, tags: ["NEC", "Evenings"] },
-  { id: 3, name: "Priya",   intent: "chat",  note: "New in town, two weeks in. Would rather meet someone than keep scrolling.",                     distance: 620,  bearing: 280, minutesAgo: 2,  tags: ["New here"] },
-  { id: 4, name: "Owen",    intent: "swap",  note: "I'll teach you AutoCAD. Want help with anything spreadsheet-shaped in return.",                 distance: 890,  bearing: 200, minutesAgo: 26, tags: ["AutoCAD", "Trade"] },
-  { id: 5, name: "Tasha",   intent: "build", note: "Small coffee shop opening next spring. Looking for someone who knows buildout.",                distance: 1150, bearing: 95,  minutesAgo: 38, tags: ["Food & bev", "Long-term"] },
-  { id: 6, name: "Rafi",    intent: "chat",  note: "Free until 4. Happy to walk and talk about basically anything.",                                distance: 410,  bearing: 330, minutesAgo: 7,  tags: ["Today only"] },
-];
-
 const MAX_RANGE = 1400;
-let state = { isLive: false, myIntent: "build", myNote: "", myName: "",
-              filter: "all", query: "", activeId: null, waved: [] };
+let state = {
+  isLive: false, myBroadcastId: null,
+  myIntent: "build", myNote: "", myName: "",
+  filter: "all", query: "", activeId: null, waved: [],
+  coords: null, locating: true, locationError: null,
+  feed: [],
+};
 
 /* deterministic avatar color from a name */
 const AVATAR_COLORS = ["#FF5C39","#1B9E6E","#6B4EFF","#D98C1F","#2E7BC4","#C2456E"];
@@ -330,33 +331,29 @@ function avatarFor(name) {
   return { initial, color };
 }
 
-/* load saved */
+/* load draft (name/note/intent only — live status comes from the server) */
 try {
   const saved = JSON.parse(localStorage.getItem("nearby-app") || "{}");
   if (saved.myIntent) state.myIntent = saved.myIntent;
   if (typeof saved.myNote === "string") state.myNote = saved.myNote;
   if (typeof saved.myName === "string") state.myName = saved.myName;
-  if (saved.isLive) state.isLive = true;
-  if (Array.isArray(saved.waved)) state.waved = saved.waved;
 } catch (e) {}
 
 function save() {
   try {
     localStorage.setItem("nearby-app", JSON.stringify({
-      myIntent: state.myIntent, myNote: state.myNote, myName: state.myName,
-      isLive: state.isLive, waved: state.waved
+      myIntent: state.myIntent, myNote: state.myNote, myName: state.myName
     }));
   } catch (e) {}
 }
 
 const $ = (id) => document.getElementById(id);
-const fmt = (m) => m < 1000 ? m + " m" : (m / 1000).toFixed(1) + " km";
+const fmt = (m) => m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(1) + " km";
 
-/* ---------- radar ---------- */
-/* single source of truth for what's showing */
+/* ---------- single source of truth for what's showing ---------- */
 function visibleSignals() {
   const q = state.query.trim().toLowerCase();
-  return NEARBY.filter(s => {
+  return state.feed.filter(s => {
     if (state.filter !== "all" && s.intent !== state.filter) return false;
     if (!q) return true;
     const haystack = [s.name, s.note, INTENTS[s.intent].label, ...s.tags].join(" ").toLowerCase();
@@ -389,8 +386,6 @@ function drawRadar() {
              <text x="${c + 4}" y="${c - r + 11}" class="ring-label">${m}m</text>`;
   });
 
-  html += `<rect x="${c - maxR}" y="${c - maxR}" width="${maxR * 2}" height="${maxR * 2}" class="ring"/>`;
-
   html += `<line x1="${c}" y1="${c - maxR}" x2="${c}" y2="${c + maxR}" class="crosshair"/>
            <line x1="${c - maxR}" y1="${c}" x2="${c + maxR}" y2="${c}" class="crosshair"/>`;
 
@@ -418,7 +413,7 @@ function drawRadar() {
 
   svg.querySelectorAll(".blip").forEach(el => {
     el.addEventListener("click", () => {
-      const id = Number(el.dataset.id);
+      const id = el.dataset.id;
       state.activeId = state.activeId === id ? null : id;
       render();
       const card = document.querySelector(`.card[data-id="${id}"]`);
@@ -452,7 +447,7 @@ function drawComposer() {
     btn.innerHTML = `
       <span class="intent-name"><span class="intent-swatch" style="background:${it.color}"></span>${it.label}</span>
       <div class="intent-blurb">${it.blurb}</div>`;
-    btn.addEventListener("click", () => { state.myIntent = id; save(); render(); });
+    btn.addEventListener("click", () => { state.myIntent = id; save(); syncLiveEdit(); render(); });
     grid.appendChild(btn);
   });
 
@@ -465,6 +460,10 @@ function drawComposer() {
   const tooShort = state.myNote.trim().length < 8;
   if (state.isLive) {
     go.textContent = "Stop broadcasting";
+  } else if (state.locating) {
+    go.textContent = "Finding your location…";
+  } else if (state.locationError) {
+    go.textContent = "Tap to enable location";
   } else if (noName) {
     go.textContent = "Add your name to go live";
   } else if (tooShort) {
@@ -473,7 +472,7 @@ function drawComposer() {
     go.textContent = "Go live for 2 hours";
   }
   go.className = "go-live" + (state.isLive ? " live" : "");
-  go.disabled = !state.isLive && (noName || tooShort);
+  go.disabled = !state.isLive && (state.locating || noName || tooShort);
 }
 
 /* ---------- feed ---------- */
@@ -498,7 +497,11 @@ function drawFeed() {
   feed.innerHTML = "";
   const emptyEl = $("empty");
   emptyEl.style.display = sorted.length === 0 ? "block" : "none";
-  emptyEl.textContent = state.query.trim()
+  emptyEl.textContent = state.locationError
+    ? state.locationError
+    : state.locating
+    ? "Finding your location…"
+    : state.query.trim()
     ? `Nothing matches "${state.query.trim()}" nearby right now.`
     : "Nobody nearby is broadcasting that right now. Try another filter, or go live yourself and let them find you.";
 
@@ -534,13 +537,13 @@ function drawFeed() {
       state.activeId = open ? null : s.id;
       render();
     });
-    card.querySelector(".wave-btn").addEventListener("click", (e) => {
+    card.querySelector(".wave-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!state.waved.includes(s.id)) {
-        state.waved.push(s.id);
-        save();
-        render();
-      }
+      if (state.waved.includes(s.id)) return;
+      state.waved.push(s.id);
+      render();
+      const { error } = await sb.from("waves").insert({ to_broadcast_id: s.id });
+      if (error && error.code !== "23505") console.error(error);
     });
     feed.appendChild(card);
   });
@@ -548,39 +551,134 @@ function drawFeed() {
 
 function render() { drawRadar(); drawComposer(); drawFeed(); }
 
+/* ---------- location ---------- */
+function requestLocation() {
+  if (!navigator.geolocation) {
+    state.locating = false;
+    state.locationError = "Your browser doesn't support location.";
+    render();
+    return;
+  }
+  state.locating = true;
+  state.locationError = null;
+  render();
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      state.coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      state.locating = false;
+      state.locationError = null;
+      render();
+      refreshFeed();
+    },
+    () => {
+      state.locating = false;
+      state.locationError = "Location access denied. Enable it in your browser's site settings, then tap the button again.";
+      render();
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+/* ---------- broadcasting ---------- */
+let syncTimer = null;
+function syncLiveEdit() {
+  if (!state.isLive || !state.myBroadcastId) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    await sb.from("broadcasts").update({
+      name: state.myName.trim(), intent: state.myIntent, note: state.myNote.trim()
+    }).eq("id", state.myBroadcastId);
+  }, 600);
+}
+
+async function goLiveOn() {
+  if (!state.coords) { requestLocation(); return; }
+  const expires_at = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb.from("broadcasts").upsert({
+    name: state.myName.trim(), intent: state.myIntent, note: state.myNote.trim(),
+    lat: state.coords.lat, lng: state.coords.lng, expires_at
+  }, { onConflict: "owner_id" }).select().single();
+  if (error) { console.error(error); return; }
+  state.myBroadcastId = data.id;
+  state.isLive = true;
+  render();
+  refreshFeed();
+}
+
+async function goLiveOff() {
+  if (state.myBroadcastId) {
+    await sb.from("broadcasts").delete().eq("id", state.myBroadcastId);
+  }
+  state.isLive = false;
+  state.myBroadcastId = null;
+  render();
+  refreshFeed();
+}
+
+async function refreshFeed() {
+  if (!state.coords) return;
+  const { data, error } = await sb.rpc("nearby_broadcasts", {
+    caller_lat: state.coords.lat, caller_lng: state.coords.lng, max_meters: MAX_RANGE
+  });
+  if (error) { console.error(error); return; }
+  state.feed = (data || []).map(r => ({
+    id: r.id, name: r.name, intent: r.intent, note: r.note, tags: r.tags || [],
+    distance: r.distance_m, bearing: r.bearing_deg,
+    minutesAgo: Math.max(0, Math.round(r.minutes_ago)),
+  }));
+  render();
+}
+
+/* ---------- events ---------- */
 $("noteInput").addEventListener("input", (e) => {
-  state.myNote = e.target.value;
-  save();
-  drawComposer();
+  state.myNote = e.target.value; save(); syncLiveEdit(); drawComposer();
 });
-
 $("nameInput").addEventListener("input", (e) => {
-  state.myName = e.target.value;
-  save();
-  drawComposer();
+  state.myName = e.target.value; save(); syncLiveEdit(); drawComposer();
 });
-
 $("search").addEventListener("input", (e) => {
-  state.query = e.target.value;
-  state.activeId = null;
+  state.query = e.target.value; state.activeId = null;
   $("searchClear").className = "search-clear" + (state.query ? " on" : "");
   render();
 });
-
 $("searchClear").addEventListener("click", () => {
-  state.query = "";
-  $("search").value = "";
-  $("searchClear").className = "search-clear";
-  render();
+  state.query = ""; $("search").value = "";
+  $("searchClear").className = "search-clear"; render();
 });
-
 $("goLive").addEventListener("click", () => {
-  state.isLive = !state.isLive;
-  save();
-  render();
+  if (state.isLive) goLiveOff();
+  else if (!state.coords) requestLocation();
+  else goLiveOn();
 });
 
-render();
+/* ---------- init ---------- */
+async function init() {
+  render();
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    const { error } = await sb.auth.signInAnonymously();
+    if (error) console.error(error);
+  }
+
+  const { data: mine } = await sb.from("broadcasts").select("*").maybeSingle();
+  if (mine && new Date(mine.expires_at) > new Date()) {
+    state.isLive = true;
+    state.myBroadcastId = mine.id;
+    state.myName = mine.name;
+    state.myIntent = mine.intent;
+    state.myNote = mine.note;
+  }
+
+  const { data: waves } = await sb.from("waves").select("to_broadcast_id");
+  state.waved = (waves || []).map(w => w.to_broadcast_id);
+
+  render();
+  requestLocation();
+  setInterval(refreshFeed, 20000);
+}
+
+init();
 </script>
 </body>
 </html>
