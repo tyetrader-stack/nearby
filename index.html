@@ -389,13 +389,21 @@ const FEED_RANGE = 40075000;     /* feed range — effectively unlimited (earth'
 let state = {
   isLive: false, myBroadcastId: null, myUserId: null,
   myIntent: "build", myNote: "", myName: "",
-  filter: "all", query: "", activeId: null, waved: [],
+  filter: "all", query: "", activeId: null,
   coords: null, locating: true, locationError: null,
   feed: [],
   matches: [], activeMatchId: null,
   chatMessages: {}, chatDraft: {},
   incomingWaves: [], lastSeenWaveAt: 0, waveBannerOpen: false,
+  myWaves: [],
 };
+
+/* have I waved at this broadcast since the given time? */
+function hasWavedSince(broadcastId, sinceMs) {
+  return state.myWaves.some(w =>
+    w.to_broadcast_id === broadcastId && new Date(w.created_at).getTime() > sinceMs
+  );
+}
 
 try {
   const seen = localStorage.getItem("nearby-last-seen-wave");
@@ -597,8 +605,11 @@ function drawFeed() {
   sorted.forEach(s => {
     const it = INTENTS[s.intent];
     const open = state.activeId === s.id;
-    const sent = state.waved.includes(s.id);
-    const isMatched = state.matches.some(m => m.otherId === s.ownerId);
+    const match = state.matches.find(m => m.otherId === s.ownerId);
+    const isMatched = match && !match.closedAt;
+    const closedAtMs = match && match.closedAt ? new Date(match.closedAt).getTime() : 0;
+    const sent = hasWavedSince(s.id, closedAtMs);
+    const wasClosed = !!(match && match.closedAt);
     const card = document.createElement("article");
     card.className = "card" + (open ? " active" : "");
     card.dataset.id = s.id;
@@ -621,7 +632,13 @@ function drawFeed() {
         <span class="ago">${s.minutesAgo} min ago</span>
       </div>
       <button class="wave-btn ${sent ? "sent" : ""}">
-        ${isMatched ? `You matched — see Your matches above to chat` : sent ? `Waved — waiting for ${escapeHtml(s.name)} to wave back too` : `Wave at ${escapeHtml(s.name)}`}
+        ${isMatched
+          ? `You matched — see Your matches above to chat`
+          : sent
+          ? `Waved — waiting for ${escapeHtml(s.name)} to wave back too`
+          : wasClosed
+          ? `Wave again to reopen with ${escapeHtml(s.name)}`
+          : `Wave at ${escapeHtml(s.name)}`}
       </button>`;
     card.addEventListener("click", () => {
       state.activeId = open ? null : s.id;
@@ -629,11 +646,14 @@ function drawFeed() {
     });
     card.querySelector(".wave-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (state.waved.includes(s.id)) return;
-      state.waved.push(s.id);
+      if (isMatched || sent) return;
+      const { data, error } = await sb.from("waves")
+        .insert({ to_broadcast_id: s.id, from_name: state.myName.trim() })
+        .select().single();
+      if (error) { console.error(error); return; }
+      state.myWaves.push(data);
+      await loadMatches();
       render();
-      const { error } = await sb.from("waves").insert({ to_broadcast_id: s.id, from_name: state.myName.trim() });
-      if (error && error.code !== "23505") console.error(error);
     });
     feed.appendChild(card);
   });
@@ -767,9 +787,11 @@ function drawWaveBanner() {
   list.appendChild(header);
 
   state.incomingWaves.forEach(w => {
-    const matched = state.matches.some(m => m.otherId === w.from_id);
+    const match = state.matches.find(m => m.otherId === w.from_id);
+    const matched = match && !match.closedAt;
+    const closedAtMs = match && match.closedAt ? new Date(match.closedAt).getTime() : 0;
     const liveEntry = state.feed.find(s => s.ownerId === w.from_id);
-    const alreadyWaved = liveEntry && state.waved.includes(liveEntry.id);
+    const alreadyWaved = liveEntry && hasWavedSince(liveEntry.id, closedAtMs);
     const item = document.createElement("div");
     item.className = "wave-item";
     const mins = Math.max(0, Math.round((Date.now() - new Date(w.created_at).getTime()) / 60000));
@@ -779,14 +801,15 @@ function drawWaveBanner() {
         <div class="wave-item-when">${mins} min ago</div>
       </div>
       <button class="wave-back-btn" ${matched || alreadyWaved || !liveEntry ? "disabled" : ""}>
-        ${matched ? "Matched" : alreadyWaved ? "Waved" : liveEntry ? "Wave back" : "Not nearby now"}
+        ${matched ? "Matched" : alreadyWaved ? "Waved" : !liveEntry ? "Not nearby now" : closedAtMs ? "Reopen" : "Wave back"}
       </button>`;
     if (liveEntry && !matched && !alreadyWaved) {
       item.querySelector(".wave-back-btn").addEventListener("click", async () => {
-        state.waved.push(liveEntry.id);
-        drawWaveBanner();
-        const { error } = await sb.from("waves").insert({ to_broadcast_id: liveEntry.id, from_name: state.myName.trim() });
-        if (error && error.code !== "23505") console.error(error);
+        const { data, error } = await sb.from("waves")
+          .insert({ to_broadcast_id: liveEntry.id, from_name: state.myName.trim() })
+          .select().single();
+        if (error) { console.error(error); return; }
+        state.myWaves.push(data);
         await loadMatches();
         render();
       });
@@ -1003,8 +1026,8 @@ async function init() {
     state.myNote = mine.note;
   }
 
-  const { data: waves } = await sb.from("waves").select("to_broadcast_id");
-  state.waved = (waves || []).map(w => w.to_broadcast_id);
+  const { data: waves } = await sb.from("waves").select("*").eq("from_id", state.myUserId);
+  state.myWaves = waves || [];
 
   await loadMatches();
   await loadIncomingWaves();
