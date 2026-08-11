@@ -268,6 +268,9 @@
   }
   .wave-back-btn:disabled { opacity: 0.4; cursor: default; border-color: var(--line); color: var(--muted); }
 
+  .wave-btn:disabled { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+  .wave-btn:disabled:hover { background: transparent; color: var(--muted); }
+
   .error-banner {
     background: #FFF1ED; border: 1px solid var(--chat); border-radius: 14px;
     padding: 12px 15px; margin-bottom: 16px; font-size: 12.5px; line-height: 1.5;
@@ -703,9 +706,11 @@ function drawFeed() {
         ${s.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("")}
         <span class="ago">${s.minutesAgo} min ago</span>
       </div>
-      <button class="wave-btn ${sent ? "sent" : ""}">
+      <button class="wave-btn ${sent ? "sent" : ""}" ${!state.isLive && !isMatched ? "disabled" : ""}>
         ${isMatched
           ? `You matched — see Your matches above to chat`
+          : !state.isLive
+          ? `Go live first — waving means they can see you too`
           : sent
           ? `Waved — waiting for ${escapeHtml(s.name)} to wave back too`
           : wasClosed
@@ -731,6 +736,10 @@ function drawFeed() {
     card.querySelector(".wave-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
       if (isMatched || sent) return;
+      if (!state.isLive) {
+        showError("waving", { message: "You need to be broadcasting before you can wave — it's mutual by design." });
+        return;
+      }
       const { data, error } = await sb.from("waves")
         .insert({ to_broadcast_id: s.id, from_name: state.myName.trim() })
         .select().single();
@@ -891,10 +900,10 @@ function drawWaveBanner() {
         <div class="wave-item-name">${escapeHtml(w.from_name || "Someone")}</div>
         <div class="wave-item-when">${mins} min ago</div>
       </div>
-      <button class="wave-back-btn" ${matched || alreadyWaved || !liveEntry ? "disabled" : ""}>
-        ${matched ? "Matched" : alreadyWaved ? "Waved" : !liveEntry ? "Not nearby now" : closedAtMs ? "Reopen" : "Wave back"}
+      <button class="wave-back-btn" ${matched || alreadyWaved || !liveEntry || !state.isLive ? "disabled" : ""}>
+        ${matched ? "Matched" : alreadyWaved ? "Waved" : !liveEntry ? "Not nearby now" : !state.isLive ? "Go live to reply" : closedAtMs ? "Reopen" : "Wave back"}
       </button>`;
-    if (liveEntry && !matched && !alreadyWaved) {
+    if (liveEntry && !matched && !alreadyWaved && state.isLive) {
       item.querySelector(".wave-back-btn").addEventListener("click", async () => {
         const { data, error } = await sb.from("waves")
           .insert({ to_broadcast_id: liveEntry.id, from_name: state.myName.trim() })
