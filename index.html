@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nearby</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1B1233;
+    --paper: #F5F3FB;
+    --card: #FFFFFF;
+    --muted: #6B6285;
+    --line: #E4DFF2;
+    --accent: #7C4DFF;
+    --accent-soft: #EFE9FF;
+    --chat: #7C4DFF;
+    --study: #00A97F;
+    --build: #4D6BFF;
+    --swap: #E0851C;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    padding: 20px 16px 56px;
+    min-height: 100vh;
+  }
+  .shell { max-width: 460px; margin: 0 auto; }
+
+  .masthead { margin-bottom: 22px; }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .pin { width: 26px; height: 34px; flex-shrink: 0; }
+  .tagline { font-size: 13.5px; color: var(--accent); margin-top: 6px; line-height: 1.45; font-weight: 500; }
+  .wordmark {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-weight: 800;
+    font-size: 34px;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 14px 14px 16px;
+    margin-bottom: 18px;
+  }
+  .radar { width: 100%; height: auto; display: block; }
+  .ring { fill: none; stroke: var(--line); stroke-width: 1; }
+  .ring-label { font-size: 8.5px; fill: var(--muted); letter-spacing: 0.04em; }
+  .crosshair { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 5; }
+  .you-dot { fill: var(--accent); }
+  .you-halo { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: 0.4; }
+  .blip { cursor: pointer; }
+
+  .sweep { animation: spin 7s linear infinite; transform-origin: 150px 150px; display: none; }
+  .sweep.on { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .radar-caption {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--muted);
+    margin-top: 10px; padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
+  .live-dot.on { background: var(--study); animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.35; } }
+
+  .composer {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 26px;
+  }
+  .composer h2 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 17px; font-weight: 600; margin-bottom: 14px;
+    letter-spacing: -0.01em;
+  }
+  .intent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .intent-btn {
+    text-align: left;
+    border: 1px solid var(--line);
+    background: transparent;
+    border-radius: 13px;
+    padding: 11px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color .15s;
+  }
+  .intent-btn:hover { border-color: var(--muted); }
+  .intent-btn.on { border-width: 2px; padding: 10px 11px; }
+  .intent-swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 7px; }
+  .intent-name { font-size: 13px; font-weight: 500; }
+  .intent-blurb { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+
+  .note-input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 11px 12px;
+    font-family: inherit;
+    font-size: 13.5px;
+    resize: vertical;
+    min-height: 70px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .note-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .note-input::placeholder { color: var(--muted); }
+  .char { font-size: 11px; color: var(--muted); text-align: right; margin-top: 5px; }
+
+  .go-live {
+    width: 100%;
+    margin-top: 12px;
+    border: none;
+    border-radius: 999px;
+    padding: 14px;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    background: var(--accent);
+    color: #FFFFFF;
+    box-shadow: 0 4px 14px rgba(124,77,255,.28);
+    transition: opacity .15s;
+  }
+  .go-live:hover { opacity: 0.88; }
+  .go-live.live { background: transparent; color: var(--accent); border: 1px solid var(--accent); box-shadow: none; }
+  .go-live:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .feed-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .feed-head h2 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 19px; font-weight: 600; letter-spacing: -0.015em;
+  }
+  .count { font-size: 12.5px; color: var(--muted); }
+
+  .chips { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 4px; }
+  .chip {
+    flex-shrink: 0;
+    border: 1px solid var(--line);
+    background: transparent;
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-family: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip.on { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left-width: 3px;
+    border-radius: 18px;
+    padding: 15px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .card:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(27,18,51,.08); }
+  .card.active { box-shadow: 0 0 0 2px var(--accent); }
+  .card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .card-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .card-dist { font-size: 12px; color: var(--muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .card-intent { font-size: 11.5px; font-weight: 500; margin-top: 3px; }
+  .card-note { font-size: 13.5px; line-height: 1.5; margin-top: 9px; color: #3A3352; }
+  .card-foot { display: flex; align-items: center; gap: 7px; margin-top: 12px; flex-wrap: wrap; }
+  .tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+  .ago { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+  .wave-btn {
+    margin-top: 12px; width: 100%;
+    border: 1px solid var(--accent); background: transparent; color: var(--accent);
+    border-radius: 999px; padding: 10px;
+    font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+    display: none;
+  }
+  .card.active .wave-btn { display: block; }
+  .wave-btn:hover { background: var(--accent); color: #FFFFFF; }
+  .wave-btn.sent { border-style: dashed; color: var(--muted); border-color: var(--line); cursor: default; }
+  .wave-btn.sent:hover { background: transparent; color: var(--muted); }
+
+  .empty {
+    text-align: center; padding: 34px 20px;
+    border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); font-size: 13.5px;
+    display: none;
+  }
+
+  .footnote {
+    margin-top: 26px; font-size: 11.5px; color: var(--muted);
+    line-height: 1.55; text-align: center;
+  }
+
+  /* ---- profile ---- */
+  .profile-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center; flex-shrink: 0;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 600; font-size: 16px; color: #fff;
+    background: var(--ink);
+  }
+  .avatar.sm { width: 34px; height: 34px; font-size: 13px; }
+  .name-input {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    background: var(--paper);
+    color: var(--ink);
+    min-width: 0;
+  }
+  .name-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---- search ---- */
+  .search-wrap { position: relative; margin-bottom: 12px; }
+  .search {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 11px 38px 11px 16px;
+    font-family: inherit;
+    font-size: 13.5px;
+    background: var(--card);
+    color: var(--ink);
+  }
+  .search:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .search::placeholder { color: var(--muted); }
+  .search-clear {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    border: none; background: transparent; color: var(--muted);
+    font-size: 18px; line-height: 1; cursor: pointer; padding: 6px 10px;
+    display: none;
+  }
+  .search-clear.on { display: block; }
+
+  .card-head { display: flex; align-items: center; gap: 10px; }
+
+  .wave-banner {
+    background: var(--accent); color: #FFFFFF;
+    border-radius: 16px; padding: 13px 16px; margin-bottom: 16px;
+    box-shadow: 0 4px 14px rgba(124,77,255,.26);
+    cursor: pointer; font-size: 13.5px; font-weight: 500;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .wave-banner .count-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #FFD84D;
+    flex-shrink: 0; display: inline-block; margin-right: 8px;
+  }
+  .wave-list { margin-bottom: 16px; }
+  .wave-item {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 12px 14px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .wave-item-name { flex: 1; font-size: 13.5px; }
+  .wave-item-when { font-size: 11px; color: var(--muted); }
+  .wave-back-btn {
+    border: 1px solid var(--ink); background: transparent; color: var(--ink);
+    border-radius: 999px; padding: 6px 12px; font-family: inherit; font-size: 12px;
+    font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .wave-back-btn:disabled { opacity: 0.4; cursor: default; border-color: var(--line); color: var(--muted); }
+
+  .wave-btn:disabled { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+  .wave-btn:disabled:hover { background: transparent; color: var(--muted); }
+
+  .error-banner {
+    background: #FFF1ED; border: 1px solid var(--chat); border-radius: 14px;
+    padding: 12px 15px; margin-bottom: 16px; font-size: 12.5px; line-height: 1.5;
+    color: #8A2C12; word-break: break-word;
+  }
+  .error-banner strong { display: block; margin-bottom: 4px; }
+
+  .info-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 15px 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.55; color: #3A3352;
+  }
+  .info-card h3 {
+    font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px;
+    font-weight: 600; margin-bottom: 8px; color: var(--ink);
+  }
+  .info-card ol { margin: 0 0 12px 17px; }
+  .info-card li { margin-bottom: 5px; }
+  .expiry-banner {
+    background: var(--card); border: 1px solid var(--swap); border-radius: 14px;
+    padding: 12px 15px; margin-bottom: 16px; font-size: 13px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .unread-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--chat);
+    flex-shrink: 0; display: inline-block;
+  }
+  .safety-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+  .safety-btn {
+    border: none; background: transparent; color: var(--muted);
+    font-family: inherit; font-size: 11.5px; cursor: pointer;
+    padding: 5px 7px; text-decoration: underline;
+  }
+  .account-box {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 15px; margin-top: 20px; font-size: 12.5px; color: var(--muted); line-height: 1.5;
+  }
+  .account-row { display: flex; gap: 8px; margin-top: 10px; }
+  .account-input {
+    flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px;
+    font-family: inherit; font-size: 13px; background: var(--paper); color: var(--ink); min-width: 0;
+  }
+  .account-btn {
+    border: none; background: var(--accent); color: #FFFFFF; border-radius: 999px;
+    padding: 9px 15px; font-family: inherit; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+  }
+
+  .close-convo {
+    border: none; background: transparent; color: var(--muted);
+    font-family: inherit; font-size: 12px; cursor: pointer;
+    padding: 6px 8px; text-decoration: underline;
+  }
+  .closed-note {
+    font-size: 12.5px; color: var(--muted); line-height: 1.45;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .dismiss-btn {
+    border: 1px solid var(--line); background: transparent; color: var(--muted);
+    border-radius: 999px; padding: 5px 11px; font-family: inherit; font-size: 11.5px;
+    cursor: pointer; white-space: nowrap;
+  }
+
+  .match-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 13px 15px; margin-bottom: 10px; cursor: pointer;
+  }
+  .match-top { display: flex; align-items: center; gap: 10px; }
+  .match-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; font-weight: 600; flex: 1; }
+  .match-hint { font-size: 11.5px; color: var(--muted); }
+  .chat-thread { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .chat-messages { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .chat-bubble { max-width: 82%; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.4; word-wrap: break-word; }
+  .chat-bubble.theirs { background: var(--paper); align-self: flex-start; border: 1px solid var(--line); }
+  .chat-bubble.mine { background: var(--accent); color: #FFFFFF; align-self: flex-end; }
+  .chat-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 10px 0; }
+  .chat-row { display: flex; gap: 8px; }
+  .chat-input {
+    flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px;
+    font-family: inherit; font-size: 13px; background: var(--paper); color: var(--ink);
+  }
+  .chat-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chat-send {
+    border: none; background: var(--accent); color: #FFFFFF; border-radius: 999px;
+    padding: 9px 16px; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sweep, .live-dot.on { animation: none; }
+    .card { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="masthead">
+    <div class="brand">
+      <svg class="pin" viewBox="0 0 24 32" aria-hidden="true">
+        <path d="M12 0C5.4 0 0 5.4 0 12c0 8.4 12 20 12 20s12-11.6 12-20c0-6.6-5.4-12-12-12z" fill="#7C4DFF"/>
+        <circle cx="12" cy="12" r="4.6" fill="#FFFFFF"/>
+      </svg>
+      <h1 class="wordmark">nearby</h1>
+    </div>
+    <p class="tagline">Meet people. Share intentions. Right now.</p>
+  </header>
+
+  <div id="errorBanner" style="display:none;"></div>
+  <div id="onboarding" style="display:none;"></div>
+  <div id="expiryBanner" style="display:none;"></div>
+  <div id="waveBanner" style="display:none;"></div>
+
+  <div class="panel">
+    <svg class="radar" id="radar" viewBox="0 0 300 300"></svg>
+    <div class="radar-caption">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="liveText">You're hidden — nobody can see you</span>
+    </div>
+  </div>
+
+  <section class="composer">
+    <h2 id="composerTitle">What are you up for?</h2>
+    <div class="profile-row">
+      <div class="avatar" id="myAvatar">?</div>
+      <input class="name-input" id="nameInput" maxlength="24" placeholder="Your first name" />
+    </div>
+    <div class="intent-grid" id="intentGrid"></div>
+    <textarea class="note-input" id="noteInput" maxlength="140"
+      placeholder="One line so people know what they'd be walking into. Be specific — it's what makes someone reach out."></textarea>
+    <div class="char"><span id="charCount">0</span>/140</div>
+    <button class="go-live" id="goLive" disabled>Finding your location…</button>
+  </section>
+
+  <section id="matchesSection" style="display:none; margin-bottom: 26px;">
+    <div class="feed-head">
+      <h2>Your matches</h2>
+    </div>
+    <div id="matchesList"></div>
+  </section>
+
+  <section>
+    <div class="feed-head">
+      <h2>Live right now</h2>
+      <span class="count"><span id="feedCount">0</span> broadcasting</span>
+    </div>
+    <div class="search-wrap">
+      <input class="search" id="search" placeholder="Search names, notes, or tags" />
+      <button class="search-clear" id="searchClear" aria-label="Clear search">&times;</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div id="feed"></div>
+    <div class="empty" id="empty">Finding your location…</div>
+  </section>
+
+  <div id="accountBox" class="account-box"></div>
+
+  <p class="footnote">
+    Nobody sees your exact location — only rough distance and direction, and only while you're live.
+    Waves are mutual: you both have to wave before names or messages open up.
+  </p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+/* ---------- backend ---------- */
+const SUPABASE_URL = "https://mopuxeuqftmpjxummnfs.supabase.co";
+const SUPABASE_KEY = "sb_publishable_rPBcB_Z2zCZB5pjLKoqv7g_wooEI2I_";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const INTENTS = {
+  chat:  { label: "Open to chat",      blurb: "Coffee, a walk, a conversation with someone new", color: "#7C4DFF" },
+  study: { label: "Study partner",     blurb: "Working through something and want company",       color: "#00A97F" },
+  build: { label: "Building something",blurb: "Looking for a collaborator on a project",          color: "#4D6BFF" },
+  swap:  { label: "Skill swap",        blurb: "Teach what you know, learn what you don't",        color: "#E0851C" },
+};
+
+const MAX_RANGE = 3000;          /* radar ring scale — blips beyond this pin to the edge */
+const FEED_RANGE = 40075000;     /* feed range — effectively unlimited (earth's circumference) */
+let state = {
+  isLive: false, myBroadcastId: null, myUserId: null,
+  myIntent: "build", myNote: "", myName: "",
+  filter: "all", query: "", activeId: null,
+  coords: null, locating: true, locationError: null,
+  feed: [],
+  matches: [], activeMatchId: null,
+  chatMessages: {}, chatDraft: {},
+  incomingWaves: [], lastSeenWaveAt: 0, waveBannerOpen: false,
+  myWaves: [],
+  unread: {}, lastRead: {},
+  expiresAt: null, myEmail: null,
+  onboardingSeen: false,
+};
+
+try { state.lastRead = JSON.parse(localStorage.getItem("nearby-last-read") || "{}"); } catch (e) {}
+try { state.onboardingSeen = localStorage.getItem("nearby-onboarded") === "1"; } catch (e) {}
+
+/* have I waved at this broadcast since the given time? */
+function hasWavedSince(broadcastId, sinceMs) {
+  return state.myWaves.some(w =>
+    w.to_broadcast_id === broadcastId && new Date(w.created_at).getTime() > sinceMs
+  );
+}
+
+try {
+  const seen = localStorage.getItem("nearby-last-seen-wave");
+  if (seen) state.lastSeenWaveAt = Number(seen);
+} catch (e) {}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : String(str);
+  return div.innerHTML;
+}
+
+/* surface backend errors on screen — phones have no visible console */
+function showError(where, err) {
+  console.error(where, err);
+  const el = document.getElementById("errorBanner");
+  if (!el) return;
+  const msg = err && (err.message || err.hint || err.details) ? (err.message || err.hint || err.details) : String(err);
+  el.style.display = "block";
+  el.innerHTML = `<div class="error-banner"><strong>Something went wrong (${escapeHtml(where)})</strong>${escapeHtml(msg)}</div>`;
+}
+function clearError() {
+  const el = document.getElementById("errorBanner");
+  if (el) { el.style.display = "none"; el.innerHTML = ""; }
+}
+
+/* deterministic avatar color from a name */
+const AVATAR_COLORS = ["#7C4DFF","#00A97F","#4D6BFF","#E0851C","#2E7BC4","#C2456E"];
+function avatarFor(name) {
+  const clean = (name || "").trim();
+  const initial = clean ? clean[0].toUpperCase() : "?";
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) >>> 0;
+  const color = clean ? AVATAR_COLORS[hash % AVATAR_COLORS.length] : "#6B6285";
+  return { initial, color };
+}
+
+/* load draft (name/note/intent only — live status comes from the server) */
+try {
+  const saved = JSON.parse(localStorage.getItem("nearby-app") || "{}");
+  if (saved.myIntent) state.myIntent = saved.myIntent;
+  if (typeof saved.myNote === "string") state.myNote = saved.myNote;
+  if (typeof saved.myName === "string") state.myName = saved.myName;
+} catch (e) {}
+
+function save() {
+  try {
+    localStorage.setItem("nearby-app", JSON.stringify({
+      myIntent: state.myIntent, myNote: state.myNote, myName: state.myName
+    }));
+  } catch (e) {}
+}
+
+const $ = (id) => document.getElementById(id);
+const fmt = (m) => m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(1) + " km";
+
+/* ---------- single source of truth for what's showing ---------- */
+function visibleSignals() {
+  const q = state.query.trim().toLowerCase();
+  return state.feed.filter(s => {
+    if (state.filter !== "all" && s.intent !== state.filter) return false;
+    if (!q) return true;
+    const haystack = [s.name, s.note, INTENTS[s.intent].label, ...s.tags].join(" ").toLowerCase();
+    return haystack.includes(q);
+  });
+}
+
+function drawRadar() {
+  const size = 300, c = 150, maxR = c - 26;
+  const svg = $("radar");
+  const visible = visibleSignals();
+
+  const pos = (distance, bearing) => {
+    const r = Math.min(distance / MAX_RANGE, 1) * maxR;
+    const rad = ((bearing - 90) * Math.PI) / 180;
+    return { x: c + r * Math.cos(rad), y: c + r * Math.sin(rad) };
+  };
+
+  let html = `
+    <defs>
+      <radialGradient id="sweepGrad">
+        <stop offset="0%" stop-color="#7C4DFF" stop-opacity="0.20"/>
+        <stop offset="100%" stop-color="#7C4DFF" stop-opacity="0"/>
+      </radialGradient>
+    </defs>`;
+
+  [1000, 2000, 3000].forEach(m => {
+    const r = (m / MAX_RANGE) * maxR;
+    html += `<circle cx="${c}" cy="${c}" r="${r}" class="ring"/>
+             <text x="${c + 4}" y="${c - r + 11}" class="ring-label">${m}m</text>`;
+  });
+
+  html += `<line x1="${c}" y1="${c - maxR}" x2="${c}" y2="${c + maxR}" class="crosshair"/>
+           <line x1="${c - maxR}" y1="${c}" x2="${c + maxR}" y2="${c}" class="crosshair"/>`;
+
+  const sx = c + maxR * Math.sin(Math.PI / 3);
+  const sy = c - maxR * Math.cos(Math.PI / 3);
+  html += `<g class="sweep ${state.isLive ? "on" : ""}">
+             <path d="M ${c} ${c} L ${c} ${c - maxR} A ${maxR} ${maxR} 0 0 1 ${sx} ${sy} Z" fill="url(#sweepGrad)"/>
+           </g>`;
+
+  visible.forEach(s => {
+    const { x, y } = pos(s.distance, s.bearing);
+    const color = INTENTS[s.intent].color;
+    const active = state.activeId === s.id;
+    const beyond = s.distance > MAX_RANGE;
+    html += `<g class="blip" data-id="${s.id}" opacity="${beyond ? 0.45 : 1}">
+      <circle cx="${x}" cy="${y}" r="${active ? 16 : 12}" fill="${color}" opacity="0.16"/>
+      <circle cx="${x}" cy="${y}" r="${active ? 7 : 5}" fill="${color}"/>
+      ${active ? `<circle cx="${x}" cy="${y}" r="11" fill="none" stroke="${color}" stroke-width="1.5"/>` : ""}
+    </g>`;
+  });
+
+  html += `<circle cx="${c}" cy="${c}" r="6" class="you-dot"/>
+           <circle cx="${c}" cy="${c}" r="12" class="you-halo"/>`;
+
+  svg.innerHTML = html;
+
+  svg.querySelectorAll(".blip").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.id;
+      state.activeId = state.activeId === id ? null : id;
+      render();
+      const card = document.querySelector(`.card[data-id="${id}"]`);
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
+
+  $("liveDot").className = "live-dot" + (state.isLive ? " on" : "");
+  $("liveText").textContent = state.isLive
+    ? "You're visible to anyone broadcasting — radar shows the nearest 3 km"
+    : "You're hidden — nobody can see you";
+}
+
+/* ---------- composer ---------- */
+function drawComposer() {
+  $("composerTitle").textContent = state.isLive ? "Your broadcast" : "What are you up for?";
+
+  const av = avatarFor(state.myName);
+  const avEl = $("myAvatar");
+  avEl.textContent = av.initial;
+  avEl.style.background = av.color;
+  const nameEl = $("nameInput");
+  if (nameEl.value !== state.myName) nameEl.value = state.myName;
+
+  const grid = $("intentGrid");
+  grid.innerHTML = "";
+  Object.entries(INTENTS).forEach(([id, it]) => {
+    const btn = document.createElement("button");
+    btn.className = "intent-btn" + (state.myIntent === id ? " on" : "");
+    if (state.myIntent === id) btn.style.borderColor = it.color;
+    btn.innerHTML = `
+      <span class="intent-name"><span class="intent-swatch" style="background:${it.color}"></span>${it.label}</span>
+      <div class="intent-blurb">${it.blurb}</div>`;
+    btn.addEventListener("click", () => { state.myIntent = id; save(); syncLiveEdit(); render(); });
+    grid.appendChild(btn);
+  });
+
+  const note = $("noteInput");
+  if (note.value !== state.myNote) note.value = state.myNote;
+  $("charCount").textContent = state.myNote.length;
+
+  const go = $("goLive");
+  const noName = state.myName.trim().length < 1;
+  const tooShort = state.myNote.trim().length < 8;
+  if (state.isLive) {
+    go.textContent = "Stop broadcasting";
+  } else if (state.locating) {
+    go.textContent = "Finding your location…";
+  } else if (state.locationError) {
+    go.textContent = "Tap to enable location";
+  } else if (noName) {
+    go.textContent = "Add your name to go live";
+  } else if (tooShort) {
+    go.textContent = "Write a line first, then go live";
+  } else {
+    go.textContent = "Go live";
+  }
+  go.className = "go-live" + (state.isLive ? " live" : "");
+  go.disabled = !state.isLive && (state.locating || noName || tooShort);
+}
+
+/* ---------- feed ---------- */
+function drawFeed() {
+  const sorted = visibleSignals().sort((a, b) => a.distance - b.distance);
+
+  $("feedCount").textContent = sorted.length;
+
+  const chips = $("chips");
+  chips.innerHTML = "";
+  const mk = (id, label) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (state.filter === id ? " on" : "");
+    b.textContent = label;
+    b.addEventListener("click", () => { state.filter = id; state.activeId = null; render(); });
+    chips.appendChild(b);
+  };
+  mk("all", "Everyone");
+  Object.entries(INTENTS).forEach(([id, it]) => mk(id, it.label));
+
+  const feed = $("feed");
+  feed.innerHTML = "";
+  const emptyEl = $("empty");
+  emptyEl.style.display = sorted.length === 0 ? "block" : "none";
+  emptyEl.textContent = state.locationError
+    ? state.locationError
+    : state.locating
+    ? "Finding your location…"
+    : state.query.trim()
+    ? `Nothing matches "${state.query.trim()}" nearby right now.`
+    : "Nobody nearby is broadcasting that right now. Try another filter, or go live yourself and let them find you.";
+
+  sorted.forEach(s => {
+    const it = INTENTS[s.intent];
+    const open = state.activeId === s.id;
+    const match = state.matches.find(m => m.otherId === s.ownerId);
+    const isMatched = match && !match.closedAt;
+    const closedAtMs = match && match.closedAt ? new Date(match.closedAt).getTime() : 0;
+    const sent = hasWavedSince(s.id, closedAtMs);
+    const wasClosed = !!(match && match.closedAt);
+    const card = document.createElement("article");
+    card.className = "card" + (open ? " active" : "");
+    card.dataset.id = s.id;
+    card.style.borderLeftColor = it.color;
+    const av = avatarFor(s.name);
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-head">
+          <div class="avatar sm" style="background:${av.color}">${escapeHtml(av.initial)}</div>
+          <div>
+            <div class="card-name">${escapeHtml(s.name)}</div>
+            <div class="card-intent" style="color:${it.color}">${it.label}</div>
+          </div>
+        </div>
+        <span class="card-dist">${fmt(s.distance)}</span>
+      </div>
+      <p class="card-note">${escapeHtml(s.note)}</p>
+      <div class="card-foot">
+        ${s.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("")}
+        <span class="ago">active ${s.minutesAgo < 1 ? "now" : s.minutesAgo + " min ago"}</span>
+      </div>
+      <button class="wave-btn ${sent ? "sent" : ""}" ${!state.isLive && !isMatched ? "disabled" : ""}>
+        ${isMatched
+          ? `You matched — see Your matches above to chat`
+          : !state.isLive
+          ? `Go live first — waving means they can see you too`
+          : sent
+          ? `Waved — waiting for ${escapeHtml(s.name)} to wave back too`
+          : wasClosed
+          ? `Wave again to reopen with ${escapeHtml(s.name)}`
+          : `Wave at ${escapeHtml(s.name)}`}
+      </button>
+      ${open ? `<div class="safety-row">
+        <button class="safety-btn feed-report">Report</button>
+        <button class="safety-btn feed-block">Block</button>
+      </div>` : ""}`;
+    card.addEventListener("click", () => {
+      state.activeId = open ? null : s.id;
+      render();
+    });
+    if (open) {
+      card.querySelector(".feed-report").addEventListener("click", async (e) => {
+        e.stopPropagation(); await reportUser(s.ownerId, s.name);
+      });
+      card.querySelector(".feed-block").addEventListener("click", async (e) => {
+        e.stopPropagation(); await blockUser(s.ownerId, s.name);
+      });
+    }
+    card.querySelector(".wave-btn").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (isMatched || sent) return;
+      if (!state.isLive) {
+        showError("waving", { message: "You need to be broadcasting before you can wave — it's mutual by design." });
+        return;
+      }
+      const { data, error } = await sb.from("waves")
+        .insert({ to_broadcast_id: s.id, from_name: state.myName.trim() })
+        .select().single();
+      if (error) { showError("sending wave", error); return; }
+      state.myWaves.push(data);
+      await loadMatches();
+      render();
+    });
+    feed.appendChild(card);
+  });
+}
+
+function render() {
+  drawRadar(); drawComposer(); drawFeed(); drawMatches();
+  drawWaveBanner(); drawOnboarding(); drawExpiryBanner(); drawAccountBox();
+}
+
+/* ---------- location ---------- */
+function refreshCoords() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { state.coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
+    () => {},
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+function requestLocation() {
+  if (!navigator.geolocation) {
+    state.locating = false;
+    state.locationError = "Your browser doesn't support location.";
+    render();
+    return;
+  }
+  state.locating = true;
+  state.locationError = null;
+  render();
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      state.coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      state.locating = false;
+      state.locationError = null;
+      render();
+      refreshFeed();
+    },
+    () => {
+      state.locating = false;
+      state.locationError = "Location access denied. Enable it in your browser's site settings, then tap the button again.";
+      render();
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+/* ---------- broadcasting ---------- */
+let syncTimer = null;
+function syncLiveEdit() {
+  if (!state.isLive || !state.myBroadcastId) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    await sb.from("broadcasts").update({
+      name: state.myName.trim(), intent: state.myIntent, note: state.myNote.trim()
+    }).eq("id", state.myBroadcastId);
+  }, 600);
+}
+
+async function goLiveOn() {
+  if (!state.coords) { requestLocation(); return; }
+  const expires_at = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb.from("broadcasts").upsert({
+    name: state.myName.trim(), intent: state.myIntent, note: state.myNote.trim(),
+    lat: state.coords.lat, lng: state.coords.lng, expires_at,
+    last_seen_at: new Date().toISOString()
+  }, { onConflict: "owner_id" }).select().single();
+  if (error) { showError("going live", error); return; }
+  clearError();
+  state.myBroadcastId = data.id;
+  state.expiresAt = expires_at;
+  state.isLive = true;
+  render();
+  refreshFeed();
+}
+
+async function goLiveOff() {
+  if (state.myBroadcastId) {
+    await sb.from("broadcasts").delete().eq("id", state.myBroadcastId);
+  }
+  state.isLive = false;
+  state.myBroadcastId = null;
+  render();
+  refreshFeed();
+}
+
+async function heartbeat() {
+  if (!state.isLive || !state.myBroadcastId || !state.coords) return;
+  const { error } = await sb.from("broadcasts").update({
+    lat: state.coords.lat, lng: state.coords.lng, last_seen_at: new Date().toISOString()
+  }).eq("id", state.myBroadcastId);
+  if (error) showError("staying live", error);
+}
+
+async function refreshFeed() {
+  if (!state.coords) return;
+  await heartbeat();
+  const { data, error } = await sb.rpc("nearby_broadcasts", {
+    caller_lat: state.coords.lat, caller_lng: state.coords.lng, max_meters: FEED_RANGE
+  });
+  if (error) { showError("loading feed", error); return; }
+  clearError();
+  state.feed = (data || []).map(r => ({
+    id: r.id, ownerId: r.owner_id, name: r.name, intent: r.intent, note: r.note, tags: r.tags || [],
+    distance: r.distance_m, bearing: r.bearing_deg,
+    minutesAgo: Math.max(0, Math.round(r.minutes_ago)),
+  }));
+  await loadMatches();
+  await loadIncomingWaves();
+  await loadUnread();
+  render();
+}
+
+/* ---------- incoming wave badge ---------- */
+async function loadIncomingWaves() {
+  if (!state.myBroadcastId) { state.incomingWaves = []; return; }
+  const { data, error } = await sb.from("waves").select("*")
+    .eq("to_broadcast_id", state.myBroadcastId)
+    .order("created_at", { ascending: false });
+  if (error) { showError("loading waves", error); return; }
+  state.incomingWaves = data || [];
+}
+
+function markWavesSeen() {
+  const latest = state.incomingWaves.reduce((max, w) => Math.max(max, new Date(w.created_at).getTime()), state.lastSeenWaveAt);
+  state.lastSeenWaveAt = latest || Date.now();
+  try { localStorage.setItem("nearby-last-seen-wave", String(state.lastSeenWaveAt)); } catch (e) {}
+}
+
+function drawWaveBanner() {
+  const banner = $("waveBanner");
+  const unseen = state.incomingWaves.filter(w => new Date(w.created_at).getTime() > state.lastSeenWaveAt);
+
+  if (state.incomingWaves.length === 0) { banner.style.display = "none"; banner.innerHTML = ""; return; }
+  banner.style.display = "block";
+
+  if (!state.waveBannerOpen) {
+    banner.innerHTML = `
+      <div class="wave-banner">
+        <span>${unseen.length > 0 ? `<span class="count-dot"></span>` : ""}${state.incomingWaves.length} ${state.incomingWaves.length === 1 ? "person has" : "people have"} waved at you</span>
+        <span>View</span>
+      </div>`;
+    banner.querySelector(".wave-banner").addEventListener("click", () => {
+      state.waveBannerOpen = true;
+      markWavesSeen();
+      drawWaveBanner();
+    });
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "wave-list";
+  const header = document.createElement("div");
+  header.className = "wave-banner";
+  header.innerHTML = `<span>${state.incomingWaves.length} ${state.incomingWaves.length === 1 ? "person has" : "people have"} waved at you</span><span>Hide</span>`;
+  header.addEventListener("click", () => { state.waveBannerOpen = false; drawWaveBanner(); });
+  list.appendChild(header);
+
+  state.incomingWaves.forEach(w => {
+    const match = state.matches.find(m => m.otherId === w.from_id);
+    const matched = match && !match.closedAt;
+    const closedAtMs = match && match.closedAt ? new Date(match.closedAt).getTime() : 0;
+    const liveEntry = state.feed.find(s => s.ownerId === w.from_id);
+    const alreadyWaved = liveEntry && hasWavedSince(liveEntry.id, closedAtMs);
+    const item = document.createElement("div");
+    item.className = "wave-item";
+    const mins = Math.max(0, Math.round((Date.now() - new Date(w.created_at).getTime()) / 60000));
+    item.innerHTML = `
+      <div>
+        <div class="wave-item-name">${escapeHtml(w.from_name || "Someone")}</div>
+        <div class="wave-item-when">${mins} min ago</div>
+      </div>
+      <button class="wave-back-btn" ${matched || alreadyWaved || !liveEntry || !state.isLive ? "disabled" : ""}>
+        ${matched ? "Matched" : alreadyWaved ? "Waved" : !liveEntry ? "Not nearby now" : !state.isLive ? "Go live to reply" : closedAtMs ? "Reopen" : "Wave back"}
+      </button>`;
+    if (liveEntry && !matched && !alreadyWaved && state.isLive) {
+      item.querySelector(".wave-back-btn").addEventListener("click", async () => {
+        const { data, error } = await sb.from("waves")
+          .insert({ to_broadcast_id: liveEntry.id, from_name: state.myName.trim() })
+          .select().single();
+        if (error) { showError("waving back", error); return; }
+        state.myWaves.push(data);
+        await loadMatches();
+        render();
+      });
+    }
+    list.appendChild(item);
+  });
+
+  banner.innerHTML = "";
+  banner.appendChild(list);
+}
+
+/* ---------- onboarding ---------- */
+function drawOnboarding() {
+  const el = $("onboarding");
+  if (state.onboardingSeen) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML = `
+    <div class="info-card">
+      <h3>How nearby works</h3>
+      <ol>
+        <li>Say what you're up for and go live for 2 hours.</li>
+        <li>You'll see others who are live — roughly how far away and in what direction.</li>
+        <li>Wave at anyone interesting. If they wave back, a chat opens.</li>
+        <li>Nobody sees your exact location, and nobody can message you unless you both waved.</li>
+      </ol>
+      <button class="account-btn" id="dismissOnboarding">Got it</button>
+    </div>`;
+  $("dismissOnboarding").addEventListener("click", () => {
+    state.onboardingSeen = true;
+    try { localStorage.setItem("nearby-onboarded", "1"); } catch (e) {}
+    drawOnboarding();
+  });
+}
+
+/* ---------- live status ---------- */
+function drawExpiryBanner() {
+  const el = $("expiryBanner");
+  if (!state.isLive) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML = `
+    <div class="expiry-banner">
+      <span>You're live until you turn it off. If you don't open the app for 12 hours, you'll go quiet automatically.</span>
+    </div>`;
+}
+
+/* ---------- unread messages ---------- */
+async function loadUnread() {
+  if (!state.myUserId) return;
+  const { data, error } = await sb.from("messages").select("from_id, created_at").eq("to_id", state.myUserId);
+  if (error) { showError("loading unread", error); return; }
+  const counts = {};
+  (data || []).forEach(m => {
+    const since = state.lastRead[m.from_id] || 0;
+    if (new Date(m.created_at).getTime() > since) counts[m.from_id] = (counts[m.from_id] || 0) + 1;
+  });
+  state.unread = counts;
+}
+
+function markThreadRead(otherId) {
+  state.lastRead[otherId] = Date.now();
+  state.unread[otherId] = 0;
+  try { localStorage.setItem("nearby-last-read", JSON.stringify(state.lastRead)); } catch (e) {}
+}
+
+/* ---------- block & report ---------- */
+async function blockUser(otherId, name) {
+  if (!confirm(`Block ${name || "this person"}? You'll disappear from each other's feeds and neither of you can message the other. This can't be undone from the app.`)) return;
+  const { error } = await sb.from("blocks").insert({ blocked: otherId });
+  if (error && error.code !== "23505") { showError("blocking", error); return; }
+  const match = state.matches.find(m => m.otherId === otherId);
+  if (match && !match.closedAt) await closeConversation(match.matchId);
+  stopChatPoll();
+  state.activeMatchId = null;
+  await loadMatches();
+  await refreshFeed();
+  alert(`${name || "They"} won't see you and you won't see them.`);
+}
+
+async function reportUser(otherId, name) {
+  const reason = prompt(`Report ${name || "this person"}. What's the problem?\n\nType one: harassment, spam, inappropriate, unsafe, other`);
+  if (!reason) return;
+  const details = prompt("Anything else we should know? (optional)") || null;
+  const { error } = await sb.from("reports").insert({ reported: otherId, reason: reason.trim().toLowerCase(), details });
+  if (error) { console.error(error); alert("Couldn't send that report — try again."); return; }
+  if (confirm("Report sent. Do you also want to block this person?")) {
+    await blockUser(otherId, name);
+  }
+}
+
+/* ---------- account recovery ---------- */
+function drawAccountBox() {
+  const el = $("accountBox");
+  if (state.myEmail) {
+    el.innerHTML = `Your account is saved to <strong>${escapeHtml(state.myEmail)}</strong>. If you switch phones or clear your browser, sign in with that email to get your matches back.`;
+    return;
+  }
+  el.innerHTML = `
+    Right now this account only exists in this browser — clearing your data or switching phones would lose your matches and messages. Add an email to keep them.
+    <div class="account-row">
+      <input class="account-input" id="emailInput" type="email" placeholder="you@email.com" />
+      <button class="account-btn" id="saveEmailBtn">Save</button>
+    </div>
+    <div class="account-row">
+      <button class="safety-btn" id="signInBtn" style="text-align:left; padding-left:0;">Already saved an email? Sign in</button>
+    </div>`;
+  $("saveEmailBtn").addEventListener("click", async () => {
+    const email = ($("emailInput").value || "").trim();
+    if (!email) return;
+    const { error } = await sb.auth.updateUser({ email });
+    if (error) { alert("Couldn't save that: " + error.message); return; }
+    alert("Check your email and tap the confirmation link. After that your account is recoverable.");
+  });
+  $("signInBtn").addEventListener("click", async () => {
+    const email = prompt("What email did you save your account with?");
+    if (!email) return;
+    const { error } = await sb.auth.signInWithOtp({ email: email.trim() });
+    if (error) { alert("Couldn't send the link: " + error.message); return; }
+    alert("Check your email for a sign-in link. Opening it on this phone will restore your account.");
+  });
+}
+
+/* ---------- matches & chat ---------- */
+async function loadMatches() {
+  const { data, error } = await sb.from("matches").select("*");
+  if (error) { showError("loading matches", error); return; }
+  state.matches = (data || []).map(m => {
+    const mine = m.user_a === state.myUserId;
+    return {
+      matchId: m.id,
+      otherId: mine ? m.user_b : m.user_a,
+      otherName: mine ? m.user_b_name : m.user_a_name,
+      closedAt: m.closed_at,
+      closedByMe: m.closed_by === state.myUserId,
+    };
+  });
+}
+
+async function loadChatThread(otherId) {
+  const me = state.myUserId;
+  const { data, error } = await sb.from("messages").select("*")
+    .or(`and(from_id.eq.${me},to_id.eq.${otherId}),and(from_id.eq.${otherId},to_id.eq.${me})`)
+    .order("created_at", { ascending: true });
+  if (error) { showError("loading chat", error); return; }
+  state.chatMessages[otherId] = data || [];
+}
+
+function renderChatMessages(otherId) {
+  const el = $("chat-messages-" + otherId);
+  if (!el) return;
+  const msgs = state.chatMessages[otherId] || [];
+  el.innerHTML = msgs.length
+    ? msgs.map(m => `<div class="chat-bubble ${m.from_id === state.myUserId ? "mine" : "theirs"}">${escapeHtml(m.body)}</div>`).join("")
+    : `<div class="chat-empty">You matched! Say hi.</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendMessage(otherId) {
+  const input = $("chat-input-" + otherId);
+  const text = (input.value || "").trim();
+  if (!text) return;
+  input.value = "";
+  state.chatDraft[otherId] = "";
+  const { data, error } = await sb.from("messages").insert({ to_id: otherId, body: text }).select().single();
+  if (error) { showError("sending message", error); return; }
+  if (!state.chatMessages[otherId]) state.chatMessages[otherId] = [];
+  state.chatMessages[otherId].push(data);
+  renderChatMessages(otherId);
+}
+
+let chatPollTimer = null;
+function stopChatPoll() { if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; } }
+
+function drawMatches() {
+  const section = $("matchesSection");
+  const list = $("matchesList");
+
+  const dismissed = getDismissedClosures();
+  const shown = state.matches.filter(m => {
+    if (!m.closedAt) return true;
+    if (m.closedByMe) return false;              // you closed it — it's gone from your list
+    return !dismissed.includes(m.matchId);        // they closed it — show notice until dismissed
+  });
+
+  if (shown.length === 0) { section.style.display = "none"; return; }
+  section.style.display = "block";
+  list.innerHTML = "";
+
+  shown.forEach(m => {
+    const av = avatarFor(m.otherName);
+    const card = document.createElement("article");
+    card.className = "match-card";
+
+    if (m.closedAt) {
+      card.style.cursor = "default";
+      card.innerHTML = `
+        <div class="closed-note">
+          <span>${escapeHtml(m.otherName || "They")} closed this conversation.</span>
+          <button class="dismiss-btn">Dismiss</button>
+        </div>`;
+      card.querySelector(".dismiss-btn").addEventListener("click", () => {
+        dismissClosure(m.matchId);
+        drawMatches();
+      });
+      list.appendChild(card);
+      return;
+    }
+
+    const open = state.activeMatchId === m.otherId;
+    const unreadCount = state.unread[m.otherId] || 0;
+    card.innerHTML = `
+      <div class="match-top">
+        <div class="avatar sm" style="background:${av.color}">${escapeHtml(av.initial)}</div>
+        <div class="match-name">${escapeHtml(m.otherName || "Someone")}</div>
+        ${!open && unreadCount > 0 ? `<span class="unread-dot"></span>` : ""}
+        <span class="match-hint">${open ? "" : unreadCount > 0 ? `${unreadCount} new` : "Tap to chat"}</span>
+      </div>
+      ${open ? `<div class="chat-thread">
+        <div class="chat-messages" id="chat-messages-${m.otherId}"></div>
+        <div class="chat-row">
+          <input class="chat-input" id="chat-input-${m.otherId}" placeholder="Message ${escapeHtml(m.otherName || "")}…" />
+          <button class="chat-send" id="chat-send-${m.otherId}">Send</button>
+        </div>
+        <div class="safety-row">
+          <button class="safety-btn" id="report-${m.matchId}">Report</button>
+          <button class="safety-btn" id="block-${m.matchId}">Block</button>
+          <button class="close-convo" id="close-convo-${m.matchId}">Close conversation</button>
+        </div>
+      </div>` : ""}`;
+
+    card.querySelector(".match-top").addEventListener("click", async () => {
+      const wasOpen = open;
+      state.activeMatchId = wasOpen ? null : m.otherId;
+      drawMatches();
+      stopChatPoll();
+      if (!wasOpen) {
+        markThreadRead(m.otherId);
+        await loadChatThread(m.otherId);
+        renderChatMessages(m.otherId);
+        chatPollTimer = setInterval(async () => {
+          await loadChatThread(m.otherId);
+          renderChatMessages(m.otherId);
+          markThreadRead(m.otherId);
+          await loadMatches();
+          const still = state.matches.find(x => x.matchId === m.matchId);
+          if (still && still.closedAt) { stopChatPoll(); state.activeMatchId = null; drawMatches(); }
+        }, 4000);
+      }
+    });
+
+    if (open) {
+      const input = card.querySelector("#chat-input-" + m.otherId);
+      input.value = state.chatDraft[m.otherId] || "";
+      input.addEventListener("input", (e) => { state.chatDraft[m.otherId] = e.target.value; });
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(m.otherId); } });
+      card.querySelector("#chat-send-" + m.otherId).addEventListener("click", () => sendMessage(m.otherId));
+      card.querySelector("#close-convo-" + m.matchId).addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Close your conversation with ${m.otherName || "this person"}? They'll be told you closed it, and neither of you can message after that.`)) return;
+        await closeConversation(m.matchId);
+      });
+      card.querySelector("#block-" + m.matchId).addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await blockUser(m.otherId, m.otherName);
+      });
+      card.querySelector("#report-" + m.matchId).addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await reportUser(m.otherId, m.otherName);
+      });
+    }
+
+    list.appendChild(card);
+    if (open) renderChatMessages(m.otherId);
+  });
+}
+
+/* closures the other person made, that you've already dismissed */
+function getDismissedClosures() {
+  try { return JSON.parse(localStorage.getItem("nearby-dismissed-closures") || "[]"); }
+  catch (e) { return []; }
+}
+function dismissClosure(matchId) {
+  const list = getDismissedClosures();
+  if (!list.includes(matchId)) list.push(matchId);
+  try { localStorage.setItem("nearby-dismissed-closures", JSON.stringify(list)); } catch (e) {}
+}
+
+async function closeConversation(matchId) {
+  const { error } = await sb.from("matches")
+    .update({ closed_by: state.myUserId, closed_at: new Date().toISOString() })
+    .eq("id", matchId);
+  if (error) { showError("closing conversation", error); return; }
+  stopChatPoll();
+  state.activeMatchId = null;
+  await loadMatches();
+  render();
+}
+
+/* ---------- events ---------- */
+$("noteInput").addEventListener("input", (e) => {
+  state.myNote = e.target.value; save(); syncLiveEdit(); drawComposer();
+});
+$("nameInput").addEventListener("input", (e) => {
+  state.myName = e.target.value; save(); syncLiveEdit(); drawComposer();
+});
+$("search").addEventListener("input", (e) => {
+  state.query = e.target.value; state.activeId = null;
+  $("searchClear").className = "search-clear" + (state.query ? " on" : "");
+  render();
+});
+$("searchClear").addEventListener("click", () => {
+  state.query = ""; $("search").value = "";
+  $("searchClear").className = "search-clear"; render();
+});
+$("goLive").addEventListener("click", () => {
+  if (state.isLive) goLiveOff();
+  else if (!state.coords) requestLocation();
+  else goLiveOn();
+});
+
+/* ---------- init ---------- */
+async function init() {
+  render();
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    const { error } = await sb.auth.signInAnonymously();
+    if (error) showError("signing in", error);
+  }
+  const { data: { user } } = await sb.auth.getUser();
+  state.myUserId = user ? user.id : null;
+  state.myEmail = user && user.email ? user.email : null;
+
+  const { data: mine } = await sb.from("broadcasts").select("*").maybeSingle();
+  if (mine && new Date(mine.expires_at) > new Date()) {
+    state.isLive = true;
+    state.myBroadcastId = mine.id;
+    state.expiresAt = mine.expires_at;
+    state.myName = mine.name;
+    state.myIntent = mine.intent;
+    state.myNote = mine.note;
+  }
+
+  const { data: waves } = await sb.from("waves").select("*").eq("from_id", state.myUserId);
+  state.myWaves = waves || [];
+
+  await loadMatches();
+  await loadIncomingWaves();
+  await loadUnread();
+  render();
+  requestLocation();
+  setInterval(refreshFeed, 20000);
+  setInterval(() => { if (state.isLive) refreshCoords(); }, 120000);
+}
+
+init();
+</script>
+</body>
+</html>
