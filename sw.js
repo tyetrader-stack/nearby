@@ -20,7 +20,11 @@ self.addEventListener("push", (event) => {
     vibrate: [80, 40, 80],
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  const tasks = [self.registration.showNotification(title, options)];
+  if (self.navigator && self.navigator.setAppBadge) {
+    tasks.push(self.navigator.setAppBadge().catch(() => {}));
+  }
+  event.waitUntil(Promise.all(tasks));
 });
 
 self.addEventListener("notificationclick", (event) => {
